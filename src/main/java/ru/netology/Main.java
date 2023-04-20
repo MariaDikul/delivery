@@ -22,6 +22,7 @@ public class Main {
                 } else {
                     sizeToFreq.put(count, 1);
                 }
+                sizeToFreq.notify();
             }
         };
 
@@ -30,25 +31,33 @@ public class Main {
             threads.add(thread);
             thread.start();
         }
+        Runnable maxFreqLogic = () -> {
+            synchronized (sizeToFreq) {
+                while (!Thread.interrupted()) {
+                    try {
+                        sizeToFreq.wait();
+                        int sizeForMaxRepetitions = 0;
+                        int maxRepetitions = 0;
+                        for (Map.Entry<Integer, Integer> size : sizeToFreq.entrySet()) {
+                            if (size.getValue() > maxRepetitions) {
+                                maxRepetitions = size.getValue();
+                                sizeForMaxRepetitions = size.getKey();
+                            }
+                        }
+                        System.out.printf("Текущий лидер: %d (встретилось %d раз)", sizeForMaxRepetitions, maxRepetitions);
+                        System.out.println();
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }
+        };
+        Thread maxFreqThread = new Thread(maxFreqLogic);
+        maxFreqThread.start();
         for (Thread thread : threads) {
             thread.join(); // зависаем, ждём когда поток объект которого лежит в thread завершится
         }
-
-        int sizeForMaxRepetitions = 0;
-        int maxRepetitions = 0;
-        for (Map.Entry<Integer, Integer> size : sizeToFreq.entrySet()) {
-            if (size.getValue() > maxRepetitions) {
-                maxRepetitions = size.getValue();
-                sizeForMaxRepetitions = size.getKey();
-            }
-        }
-        
-        System.out.printf("Самое частое количество повторений %d (встретилось %d раз)", sizeForMaxRepetitions, maxRepetitions);
-        System.out.println();
-        System.out.println("Другие значения");
-        for (Map.Entry<Integer, Integer> size : sizeToFreq.entrySet()) {
-            System.out.println("- " + size.getKey() + "(" + size.getValue() + ")");
-        }
+        maxFreqThread.interrupt();
     }
 
     public static String generateRoute(String letters, int length) {
